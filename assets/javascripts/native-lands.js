@@ -4,9 +4,12 @@ const mapProjection = d3.geoAlbers()
 .center([.4,42.37])
 .translate([960 / 2, 500 / 2])
 
-function tooltipValue(data) {
-  console.log(data)
-  return `<p>${data.properties.Nations}</p>`
+function tooltipTerritory(data) {
+  return `<p>You're on the land of: ${data.properties.Nations}</p>`
+}
+
+function tooltipLanguages(data) {
+  return `<p>Languages spoken: ${data.properties.langs}</p>`
 }
 
 function tooltipLeft(event, tooltip){
@@ -25,7 +28,7 @@ function tooltipTop(event, tooltip) {
   }
 }
 
-function createBasemap(state, regionWithBorders, regionWithoutBorders) {
+function createBasemap(state, region) {
   const baseMap = d3.select('.native-land__map');
   const path = d3.geoPath().projection(mapProjection);
   baseMap.append('g')
@@ -43,7 +46,7 @@ function createBasemap(state, regionWithBorders, regionWithoutBorders) {
   baseMap.append('g')
   .attr('class', 'map__region')
   .selectAll('path')
-  .data(regionWithBorders.features)
+  .data(region.features)
   .enter()
   .append('path')
   .attr('fill', '#9e9ba8')
@@ -51,29 +54,18 @@ function createBasemap(state, regionWithBorders, regionWithoutBorders) {
   .attr('stroke-width', '1')
   .attr('stroke-opacity', 0.6)
   .attr('d', path)
-
-  baseMap.append('g')
-  .attr('class', 'map__region--borderless')
-  .selectAll('path')
-  .data(regionWithoutBorders.features)
-  .enter()
-  .append('path')
-  .attr('fill', '#9e9ba8')
-  .attr('stroke', 'black')
-  .attr('stroke-width', '1')
-  .attr('stroke-opacity', 0.6)
-  .attr('d', path)
-  .style('display', 'none')
 }
 
 function territoryOverlay(territoryBoundaries, territoryData) {
-  const tooltip = d3.select(".native-land__tooltip").style("opacity", 0);
+  const tooltip = d3.select(".native-land__tooltip")
+  .append("div")
+  .style("display", "none")
   const colors = d3.scaleOrdinal(['red','blue','green','purple','yellow','cyan'])
   const baseMap = d3.select('.native-land__map');
   const path = d3.geoPath().projection(mapProjection);
   
   baseMap.append('g')
-  .attr('class', 'map__region')
+  .attr('class', 'map__territories')
   .selectAll('path')
   .data(territoryBoundaries.features)
   .enter()
@@ -86,7 +78,7 @@ function territoryOverlay(territoryBoundaries, territoryData) {
   .attr('d', path)
 
   baseMap.append('g')
-  .attr('class', 'map__region')
+  .attr('class', 'map__territories')
   .selectAll('path')
   .data(territoryData.features)
   .enter()
@@ -98,30 +90,84 @@ function territoryOverlay(territoryBoundaries, territoryData) {
   .attr('stroke-opacity', 0.6)
   .attr('d', path)
   .on("mousemove", (d) => {
-    // tooltip.attr("class", "move")
-    tooltip.transition()
-    .duration(50)
-    .style("opacity", 1);
-    // tooltip.text("hello world")
-    tooltip.html(tooltipValue(d))
-    .style("left", tooltipLeft(d3.event, document.getElementsByClassName('native-land__tooltip')[0]))
-    .style("top", tooltipTop(d3.event,  document.getElementsByClassName('native-land__tooltip')[0]))
-    }) 
-  .on("mouseleave", d => {
-    tooltip.transition()
-    .duration(200)
-    .style("opacity",0)
+    tooltip.html(tooltipTerritory(d))
+    .style("display", "inline")
+  }) 
+}
+
+function languageOverlay(territoryBoundaries, territoryData) {
+  const tooltip = d3.select(".native-land__tooltip")
+  .append("div")
+  .style("display", "none")
+  const colors = d3.scaleOrdinal(['red','blue','green','purple','yellow','cyan'])
+  const baseMap = d3.select('.native-land__map');
+  const path = d3.geoPath().projection(mapProjection);
+  
+  baseMap.append('g')
+  .attr('class', 'map__languages')
+  .selectAll('path')
+  .data(territoryBoundaries.features)
+  .enter()
+  .append('path')
+  .attr("fill", (d,i) => colors(i))
+  .attr("fill-opacity", .4)
+  .attr('stroke', 'black')
+  .attr('stroke-width', '1')
+  .attr('stroke-opacity', 0.6)
+  .attr('d', path)
+
+  baseMap.append('g')
+  .attr('class', 'map__languages')
+  .selectAll('path')
+  .data(territoryData.features)
+  .enter()
+  .append('path')
+  .attr("fill", 'white')
+  .attr("fill-opacity", 0)
+  .attr('stroke', 'black')
+  .attr('stroke-width', '1')
+  .attr('stroke-opacity', 0)
+  .attr('d', path)
+  .on("mousemove", (d) => {
+    tooltip.html(tooltipLanguages(d))
+    .style("display", "inline")
   })
+}
+
+function createLegend() {
+  const legendEl = document.querySelector(".native-land__sidebar")
+  d3.selectAll('.map__languages').attr("visibility", "hidden")
+  legendEl.addEventListener("click", function(e){
+    switch(e.target.classList[0]) {
+      case "toggle__territory":
+        toggleLine('.map__territories')
+        break
+      case "toggle__language":
+        toggleLine('.map__languages')
+        break
+    }
+  })
+}
+
+function toggleLine(elementClass){
+  const selection = document.querySelector(elementClass)
+  if (selection.getAttribute("visibility") === "hidden"){
+    d3.selectAll(elementClass).attr("visibility", "visible")
+  } else {
+    d3.selectAll(elementClass).attr("visibility", "hidden")
+  }
 }
 
 Promise.all([
   d3.json('/assets/data/ma-basemap.geojson'),
   d3.json('/assets/data/mapc-with-borders.geojson'),
-  d3.json('/assets/data/mapc-no-borders.geojson'),
-  d3.json('/assets/data/language-intersection.geojson'),
   d3.json('/assets/data/full-territory.geojson'),
   d3.json('/assets/data/overlapping-territory-data.geojson'),
+  d3.json('/assets/data/full-language.geojson'),
+  d3.json('/assets/data/overlapping-language-data.geojson')
 ]).then(data => {
-  createBasemap(data[0], data[1], data[2])
-  territoryOverlay(data[4], data[5])
+  createBasemap(data[0], data[1])
+  territoryOverlay(data[2], data[3])
+  languageOverlay(data[4],data[5])
+  createLegend()
 })
